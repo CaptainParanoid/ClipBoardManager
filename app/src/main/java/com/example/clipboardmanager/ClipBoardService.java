@@ -30,9 +30,11 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
     private ClipboardManager clipboard;
     private static final String channelId = "bed076a8-3500-460a-8af6-dde57687e4ea";
     private static final String channelName = "clipboard-service-manager";
-    private static final String URL="http://www.mocky.io/v2/5d0500eb3200007700d78c06";
+    private static final String URL="http://www.mocky.io/v2/5d050a393200004e00d78c1e";
     public static final MediaType JSON
             = MediaType.get("application/json; charset=utf-8");
+    private String lastClipBoard="";
+    private boolean enabled=true;
 
 
     @Override
@@ -48,26 +50,45 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
         }else if(DISABLE_SERVICE.equals(action)){
             disableClipBoardListner();
         }else{
-            startForeground(1, makeNotification());
+            startForeground(1, makeNotification(false));
+            makeNotificationChannel(channelId, channelName);
             initializeClipBoard();
         }
         return START_STICKY;
     }
 
+    @Override
+    public void onPrimaryClipChanged() {
+        if (clipboard.getPrimaryClip() != null && clipboard.getPrimaryClip().getItemCount() > 0) {
+            String clipboardText = String.valueOf(clipboard.getPrimaryClip().getItemAt(0).getText());
+            Log.d(TAG, clipboardText);
+            if( !clipboardText.equals(lastClipBoard)){
+                Executor.execute(()-> pushToServer(clipboardText));
+                lastClipBoard=clipboardText;
+            }
+        }
+    }
+
+    //helper functions
+
     private void initializeClipBoard() {
         clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        enableClipBoardListener();
+        clipboard.addPrimaryClipChangedListener(this);
     }
 
     private void enableClipBoardListener() {
         clipboard.addPrimaryClipChangedListener(this);
+        stopForeground(true);
+        startForeground(1,makeNotification(false));
     }
 
     private void disableClipBoardListner() {
         clipboard.removePrimaryClipChangedListener(this);
+        stopForeground(true);
+        startForeground(1,makeNotification(true));
     }
 
-    private Notification makeNotification() {
+    private Notification makeNotification(boolean showEnableButton) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId);
         NotificationCompat.BigTextStyle bigTextStyle = new NotificationCompat.BigTextStyle();
         bigTextStyle.setBigContentTitle("Clipboard Manager is running in background");
@@ -78,22 +99,28 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
         builder.setSmallIcon(R.mipmap.ic_launcher);
         Bitmap largeIconBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.clipboard);
         builder.setLargeIcon(largeIconBitmap);
+        if(showEnableButton){
+            builder.addAction(getEnableButton());
+        }else{
+            builder.addAction(getDisableButton());
+        }
+        return builder.build();
+    }
 
+    private NotificationCompat.Action getEnableButton(){
         // Add Play button intent in notification.
         Intent playIntent = new Intent(this, ClipBoardService.class);
         playIntent.setAction(ENABLE_SERVICE);
         PendingIntent pendingPlayIntent = PendingIntent.getService(this, 0, playIntent, 0);
-        NotificationCompat.Action playAction = new NotificationCompat.Action(android.R.drawable.ic_media_play, "Enable", pendingPlayIntent);
-        builder.addAction(playAction);
+        return new NotificationCompat.Action(android.R.drawable.ic_media_play, "Enable", pendingPlayIntent);
+    }
 
+    private NotificationCompat.Action getDisableButton(){
         // Add Pause button intent in notification.
         Intent pauseIntent = new Intent(this, ClipBoardService.class);
         pauseIntent.setAction(DISABLE_SERVICE);
         PendingIntent pendingPrevIntent = PendingIntent.getService(this, 0, pauseIntent, 0);
-        NotificationCompat.Action prevAction = new NotificationCompat.Action(android.R.drawable.ic_media_pause, "Disable", pendingPrevIntent);
-        builder.addAction(prevAction);
-        makeNotificationChannel(channelId, channelName);
-        return builder.build();
+       return new NotificationCompat.Action(android.R.drawable.ic_media_pause, "Disable", pendingPrevIntent);
     }
 
     private void makeNotificationChannel(String channelId, String channelName) {
@@ -107,15 +134,6 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
         }
     }
 
-    @Override
-    public void onPrimaryClipChanged() {
-        if (clipboard.getPrimaryClip() != null && clipboard.getPrimaryClip().getItemCount() > 0) {
-            String clipboardText = String.valueOf(clipboard.getPrimaryClip().getItemAt(0).getText());
-            Log.d(TAG, clipboardText);
-            Executor.execute(()-> pushToServer(clipboardText));
-        }
-    }
-
     public void pushToServer(String clipboardText){
         try{
             JSONObject jsonObject=new JSONObject();
@@ -126,7 +144,11 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
                     .post(body).build();
                 OkHttpClient client=WebClient.getInstance();
                 try (Response response = client.newCall(request).execute()) {
-                    Log.d(TAG,"Response "+response.body()+"Response code "+response.code());
+                    String responseText=null;
+                    if(response.body()!=null){
+                        responseText=response.body().string();
+                    }
+                    Log.d(TAG,"Response "+responseText+"Response code "+response.code());
                 }
         }catch (Exception e){
             Log.e(TAG,"Error while pushing to server",e.getCause());
