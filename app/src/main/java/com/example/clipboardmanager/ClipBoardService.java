@@ -30,7 +30,7 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
     private ClipboardManager clipboard;
     private static final String channelId = "bed076a8-3500-460a-8af6-dde57687e4ea";
     private static final String channelName = "clipboard-service-manager";
-    private static final String URL="";
+    private static final String URL="http://www.mocky.io/v2/5d0500eb3200007700d78c06";
     public static final MediaType JSON
             = MediaType.get("application/json; charset=utf-8");
 
@@ -130,6 +130,7 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
                 }
         }catch (Exception e){
             Log.e(TAG,"Error while pushing to server",e.getCause());
+            e.printStackTrace();
         }
     }
 }
