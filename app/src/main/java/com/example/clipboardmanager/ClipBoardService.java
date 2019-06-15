@@ -15,13 +15,24 @@ import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
+import org.json.JSONObject;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 public class ClipBoardService extends Service implements ClipboardManager.OnPrimaryClipChangedListener {
     private static final String ENABLE_SERVICE = "ENABLE_SERVICE";
     private static final String DISABLE_SERVICE = "DISABLE_SERVICE";
     private static final String TAG = "CBM:ClipBoardService";
     private ClipboardManager clipboard;
-    private String channelId = "bed076a8-3500-460a-8af6-dde57687e4ea";
-    private String channelName = "clipboard-service-manager";
+    private static final String channelId = "bed076a8-3500-460a-8af6-dde57687e4ea";
+    private static final String channelName = "clipboard-service-manager";
+    private static final String URL="";
+    public static final MediaType JSON
+            = MediaType.get("application/json; charset=utf-8");
 
 
     @Override
@@ -101,13 +112,24 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
         if (clipboard.getPrimaryClip() != null && clipboard.getPrimaryClip().getItemCount() > 0) {
             String clipboardText = String.valueOf(clipboard.getPrimaryClip().getItemAt(0).getText());
             Log.d(TAG, clipboardText);
+            Executor.execute(()-> pushToServer(clipboardText));
         }
     }
 
     public void pushToServer(String clipboardText){
-        Executor.execute(()->{
-
-        });
-
+        try{
+            JSONObject jsonObject=new JSONObject();
+            jsonObject.put("clipboard",clipboardText);
+            RequestBody body = RequestBody.create(JSON, jsonObject.toString());
+            Request request = new Request.Builder()
+                    .url(URL)
+                    .post(body).build();
+                OkHttpClient client=WebClient.getInstance();
+                try (Response response = client.newCall(request).execute()) {
+                    Log.d(TAG,"Response "+response.body()+"Response code "+response.code());
+                }
+        }catch (Exception e){
+            Log.e(TAG,"Error while pushing to server",e.getCause());
+        }
     }
 }
