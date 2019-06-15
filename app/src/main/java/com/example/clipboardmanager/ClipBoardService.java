@@ -23,6 +23,7 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
     private String channelId = "bed076a8-3500-460a-8af6-dde57687e4ea";
     private String channelName = "clipboard-service-manager";
 
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -101,5 +102,12 @@ public class ClipBoardService extends Service implements ClipboardManager.OnPrim
             String clipboardText = String.valueOf(clipboard.getPrimaryClip().getItemAt(0).getText());
             Log.d(TAG, clipboardText);
         }
+    }
+
+    public void pushToServer(String clipboardText){
+        Executor.execute(()->{
+
+        });
+
     }
 }
